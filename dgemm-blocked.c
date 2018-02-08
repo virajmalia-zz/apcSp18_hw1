@@ -13,10 +13,13 @@ LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL
 
 */
 
+#include <cilk/cilk.h>
+#include <cilk/cilk_api.h>
+
 const char* dgemm_desc = "Simple blocked dgemm.";
 
 #if !defined(BLOCK_SIZE)
-#define BLOCK_SIZE 41
+#define BLOCK_SIZE 16
 #endif
 
 #define min(a,b) (((a)<(b))?(a):(b))
@@ -27,9 +30,9 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
   /* For each row i of A */
-  for (int i = 0; i < M; ++i)
+  for(int i = 0; i < M; ++i)
     /* For each column j of B */ 
-    for (int j = 0; j < N; ++j) 
+    for(int j = 0; j < N; ++j) 
     {
       /* Compute C(i,j) */
       double cij = C[i+j*lda];
@@ -45,10 +48,13 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  * On exit, A and B maintain their input values. */  
 void square_dgemm (int lda, double* A, double* B, double* C)
 {
+  // Set number of threads. Otherwise owuld have to export env variable
+  __cilkrts_set_param("nworkers", "8");
+
   /* For each block-row of A */ 
-  for (int i = 0; i < lda; i += BLOCK_SIZE)
+  cilk_for (int i = 0; i < lda; i += BLOCK_SIZE)
     /* For each block-column of B */
-    for (int j = 0; j < lda; j += BLOCK_SIZE)
+    cilk_for (int j = 0; j < lda; j += BLOCK_SIZE)
       /* Accumulate block dgemms into block of C */
       for (int k = 0; k < lda; k += BLOCK_SIZE)
       {
