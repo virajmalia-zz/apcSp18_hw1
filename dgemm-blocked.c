@@ -53,17 +53,23 @@ void square_dgemm (int lda, double* A, double* B, double* C)
 
   /* For each block-row of A */ 
   cilk_for (int i = 0; i < lda; i += BLOCK_SIZE)
+  {
     /* For each block-column of B */
     cilk_for (int j = 0; j < lda; j += BLOCK_SIZE)
+    {
+      int ldai = lda-i;
+      int ldaj = lda-j;
       /* Accumulate block dgemms into block of C */
       for (int k = 0; k < lda; k += BLOCK_SIZE)
       {
 	/* Correct block dimensions if block "goes off edge of" the matrix */
-	int M = min (BLOCK_SIZE, lda-i);
-	int N = min (BLOCK_SIZE, lda-j);
+        int M = min (BLOCK_SIZE, ldai);
+        int N = min (BLOCK_SIZE, ldaj);
 	int K = min (BLOCK_SIZE, lda-k);
 
 	/* Perform individual block dgemm */
 	do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
       }
+    }
+  }
 }
