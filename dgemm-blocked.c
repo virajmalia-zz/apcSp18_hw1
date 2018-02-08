@@ -48,7 +48,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  * On exit, A and B maintain their input values. */  
 void square_dgemm (int lda, double* A, double* B, double* C)
 {
-  // Set number of threads. Otherwise owuld have to export env variable
+  // Set number of threads. Otherwise would have to export env variable
   __cilkrts_set_param("nworkers", "8");
 
   /* For each block-row of A */ 
