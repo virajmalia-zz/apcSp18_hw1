@@ -5,7 +5,7 @@ COMPILER= gnu
 
     Please include All compiler flags and libraries as you want them run. You can simply copy this over from the Makefile's first few lines
  
-CC = cc
+CC = icc
 OPT = -O3
 CFLAGS = -Wall -std=gnu99 $(OPT)
 MKLROOT = /opt/intel/composer_xe_2013.1.117/mkl
@@ -21,6 +21,15 @@ const char* dgemm_desc = "Naive, three-loop dgemm.";
  * On exit, A and B maintain their input values. */    
 void square_dgemm (int n, double* A, double* B, double* C)
 {
+	int temp=0;
+	for (int i=1; i<n; i++){
+		for (int j=0; j<i; j++){
+			temp = A[i+j*n];
+			A[i+j*n] = A[j+i*n];
+			A[j+i*n] = temp;
+		}
+	}
+
   /* For each row i of A */
   for (int i = 0; i < n; ++i)
     /* For each column j of B */
@@ -29,7 +38,7 @@ void square_dgemm (int n, double* A, double* B, double* C)
       /* Compute C(i,j) */
       double cij = C[i+j*n];
       for( int k = 0; k < n; k++ )
-	cij += A[i+k*n] * B[k+j*n];
+	cij += A[k+i*n] * B[k+j*n];
       C[i+j*n] = cij;
     }
 }

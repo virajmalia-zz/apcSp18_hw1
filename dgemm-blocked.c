@@ -16,7 +16,7 @@ LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL
 const char* dgemm_desc = "Simple blocked dgemm.";
 
 #if !defined(BLOCK_SIZE)
-#define BLOCK_SIZE 41
+#define BLOCK_SIZE 100
 #endif
 
 #define min(a,b) (((a)<(b))?(a):(b))
@@ -34,7 +34,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
       /* Compute C(i,j) */
       double cij = C[i+j*lda];
       for (int k = 0; k < K; ++k)
-	cij += A[i+k*lda] * B[k+j*lda];
+	cij += A[k+i*lda] * B[k+j*lda];
       C[i+j*lda] = cij;
     }
 }
@@ -45,7 +45,19 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  * On exit, A and B maintain their input values. */  
 void square_dgemm (int lda, double* A, double* B, double* C)
 {
-  /* For each block-row of A */ 
+
+ 	int temp=0;
+        for (int i=1; i<lda; i++){
+                for (int j=0; j<i; j++){
+                        temp = A[i+j*lda];
+                        A[i+j*lda] = A[j+i*lda];
+                        A[j+i*lda] = temp;
+                }
+        } 
+
+
+
+/* For each block-row of A */ 
   for (int i = 0; i < lda; i += BLOCK_SIZE)
     /* For each block-column of B */
     for (int j = 0; j < lda; j += BLOCK_SIZE)
@@ -58,6 +70,6 @@ void square_dgemm (int lda, double* A, double* B, double* C)
 	int K = min (BLOCK_SIZE, lda-k);
 
 	/* Perform individual block dgemm */
-	do_block(lda, M, N, K, A + i + k*lda, B + k + j*lda, C + i + j*lda);
+	do_block(lda, M, N, K, A + k + i*lda, B + k + j*lda, C + i + j*lda);
       }
 }
