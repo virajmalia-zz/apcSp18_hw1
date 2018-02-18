@@ -13,6 +13,7 @@ LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL
 
 */
 #include <xmmintrin.h>
+#include <stdio.h>
 
 const char* dgemm_desc = "Simple blocked dgemm.";
 
@@ -34,44 +35,51 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
     {
       /* Compute C(i,j) */
       // double cij = C[i+j*lda];
-      __m128d cij = _mm_load_sd(&C[i+j*lda]);
-      int k;
+      // __m128d cij = _mm_load_sd(&C[i+j*lda]);
+
+// #define DEBUG
+#ifdef DEBUG
+      /* TEST C(i,j) */
+      double testCij = C[i+j*lda];
+      for( int m = 0; m < K; m++ )
+        testCij += A[m+i*lda] * B[m+j*lda];
+#endif
+
+      // double cij = C[i+j*lda];
+      // for (int k = 0; k < K; ++k)
+      //   cij += A[k+i*lda] * B[k+j*lda];
+      // C[i+j*lda] = cij;
+
+      __m128d mCij;
+      register int k;
       for (k = 0; k < K-4; k=k+4)
+      {        
+        __m128d row1 = _mm_load_pd(&B[k+j*lda]);
+        __m128d row2 = _mm_load_pd(&B[2+k+j*lda]);
+        __m128d col1 = _mm_load_pd(&A[k+i*lda]);
+        __m128d col2 = _mm_load_pd(&A[2+k+i*lda]);
+
+        mCij = _mm_add_pd(mCij, 
+                  _mm_add_pd(_mm_mul_pd(row1,col1),
+                    _mm_mul_pd(row2,col2)
+               ));
+      } // for k
+
+      double cijArr[2];
+      _mm_store_pd(&cijArr[0], mCij);
+
+      /* Compute C(i,j) */
+      double tmpCij = C[i+j*lda] + cijArr[0] + cijArr[1];
+      while(k < K)
       {
-        __m128d row1 = _mm_load_sd(&B[k+j*lda]);
-        __m128d row2 = _mm_load_sd(&B[1+k+j*lda]);
-        __m128d row3 = _mm_load_sd(&B[2+k+j*lda]);
-        __m128d row4 = _mm_load_sd(&B[3+k+j*lda]);
-
-        __m128d col1 = _mm_set_sd(A[k+i*lda]);
-        __m128d col2 = _mm_set_sd(A[1+k+i*lda]);
-        __m128d col3 = _mm_set_sd(A[2+k+i*lda]);
-        __m128d col4 = _mm_set_sd(A[3+k+i*lda]);
-
-        __m128d row = _mm_add_sd(
-          _mm_add_sd(
-            _mm_mul_sd(row1,col1),
-            _mm_mul_sd(row2,col2)
-          ),
-          _mm_add_sd(
-            _mm_mul_sd(row3,col3),
-            _mm_mul_sd(row4,col4)
-          )
-        );
-
-        cij = _mm_add_sd(cij, row);
-        // cij = _mm_add_sd(cij, _mm_mul_sd(row1,col1));
-	      // cij += A[k+i*lda] * B[k+j*lda];
-      }
-      while (k < K) 
-      {
-        __m128d row1 = _mm_load_sd(&B[k+j*lda]);
-        __m128d col1 = _mm_set_sd(A[k+i*lda]);
-        cij = _mm_add_sd(cij, _mm_mul_sd(row1,col1));
+        tmpCij += A[k+i*lda] * B[k+j*lda];
         k++;
       }
-      _mm_store_sd(&C[i+j*lda], cij);
-      // printf("C = %d, k = %i , K = %i\r\n", C[i+j*lda],k,K);
+
+      C[i+j*lda] = tmpCij;
+#ifdef DEBUG
+      printf("C = %f, \ttestC = %f, \tlda = %i , i = %i, j = %i, k = %i\r\n", C[i+j*lda], testCij, lda,i,j,k);
+#endif %i , K = %i\r\n", C[i+j*lda],k,K);
       // C[i+j*lda] = cij;
     }
 }
