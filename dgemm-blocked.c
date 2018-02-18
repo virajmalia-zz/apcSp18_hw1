@@ -51,7 +51,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
       // C[i+j*lda] = cij;
 
       __m128d mCij;
-      register int k;
+      int k;
       for (k = 0; k < K-4; k=k+4)
       {        
         __m128d row1 = _mm_load_pd(&B[k+j*lda]);
@@ -79,7 +79,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
       C[i+j*lda] = tmpCij;
 #ifdef DEBUG
       printf("C = %f, \ttestC = %f, \tlda = %i , i = %i, j = %i, k = %i\r\n", C[i+j*lda], testCij, lda,i,j,k);
-#endif %i , K = %i\r\n", C[i+j*lda],k,K);
+#endif
       // C[i+j*lda] = cij;
     }
 }
