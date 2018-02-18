@@ -12,7 +12,7 @@ MKLROOT = /opt/intel/composer_xe_2013.1.117/mkl
 LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_sequential.a $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm
 
 */
-#include <xmmintrin.h>
+#include <emmintrin.h>
 #include <stdio.h>
 
 const char* dgemm_desc = "Naive, three-loop dgemm.";
@@ -49,19 +49,31 @@ void square_dgemm (int n, double* A, double* B, double* C)
         testCij += A[m+i*n] * B[m+j*n];
 #endif
 
-      __m128d mCij;
+      __m128d mCij = _mm_setzero_pd();
       int k;
-      for (k = 0; k < n-4; k=k+4)
+      double newCij;
+      for (k = 0; k < n-8; k=k+8)
       {        
         __m128d row1 = _mm_load_pd(&B[k+j*n]);
         __m128d row2 = _mm_load_pd(&B[2+k+j*n]);
+        __m128d row3 = _mm_load_pd(&B[4+k+j*n]);
+        __m128d row4 = _mm_load_pd(&B[6+k+j*n]);
         __m128d col1 = _mm_load_pd(&A[k+i*n]);
         __m128d col2 = _mm_load_pd(&A[2+k+i*n]);
+        __m128d col3 = _mm_load_pd(&A[4+k+i*n]);
+        __m128d col4 = _mm_load_pd(&A[6+k+i*n]);
 
+        // mCij = _mm_add_pd(mCij, _mm_mul_pd(row1,col1));
         mCij = _mm_add_pd(mCij, 
-                  _mm_add_pd(_mm_mul_pd(row1,col1),
-                    _mm_mul_pd(row2,col2)
-               ));
+          _mm_add_pd(
+            _mm_add_pd(
+              _mm_mul_pd(row1,col1),
+              _mm_mul_pd(row2,col2)),
+            _mm_add_pd(
+              _mm_mul_pd(row3,col3),
+              _mm_mul_pd(row4,col4))
+          )
+        );
       } // for k
 
       double cijArr[2];
@@ -76,6 +88,7 @@ void square_dgemm (int n, double* A, double* B, double* C)
       }
 
       C[i+j*n] = tmpCij;
+
 #ifdef DEBUG
       printf("C = %f, \ttestC = %f, \tn = %i , i = %i, j = %i, k = %i\r\n", C[i+j*n], testCij, n,i,j,k);
 #endif

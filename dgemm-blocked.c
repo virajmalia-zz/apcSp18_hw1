@@ -35,7 +35,7 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
     {
       /* Compute C(i,j) */
       // double cij = C[i+j*lda];
-      // __m128d cij = _mm_load_sd(&C[i+j*lda]);
+      // __m128d cij = _mm_load_sd(&C[i+j*n]);
 
 // #define DEBUG
 #ifdef DEBUG
@@ -45,24 +45,31 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
         testCij += A[m+i*lda] * B[m+j*lda];
 #endif
 
-      // double cij = C[i+j*lda];
-      // for (int k = 0; k < K; ++k)
-      //   cij += A[k+i*lda] * B[k+j*lda];
-      // C[i+j*lda] = cij;
-
-      __m128d mCij;
+      __m128d mCij = _mm_setzero_pd();
       int k;
-      for (k = 0; k < K-4; k=k+4)
+      double newCij;
+      for (k = 0; k < K-8; k=k+8)
       {        
         __m128d row1 = _mm_load_pd(&B[k+j*lda]);
         __m128d row2 = _mm_load_pd(&B[2+k+j*lda]);
+        __m128d row3 = _mm_load_pd(&B[4+k+j*lda]);
+        __m128d row4 = _mm_load_pd(&B[6+k+j*lda]);
         __m128d col1 = _mm_load_pd(&A[k+i*lda]);
         __m128d col2 = _mm_load_pd(&A[2+k+i*lda]);
+        __m128d col3 = _mm_load_pd(&A[4+k+i*lda]);
+        __m128d col4 = _mm_load_pd(&A[6+k+i*lda]);
 
+        // mCij = _mm_add_pd(mCij, _mm_mul_pd(row1,col1));
         mCij = _mm_add_pd(mCij, 
-                  _mm_add_pd(_mm_mul_pd(row1,col1),
-                    _mm_mul_pd(row2,col2)
-               ));
+          _mm_add_pd(
+            _mm_add_pd(
+              _mm_mul_pd(row1,col1),
+              _mm_mul_pd(row2,col2)),
+            _mm_add_pd(
+              _mm_mul_pd(row3,col3),
+              _mm_mul_pd(row4,col4))
+          )
+        );
       } // for k
 
       double cijArr[2];
@@ -77,10 +84,10 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
       }
 
       C[i+j*lda] = tmpCij;
+
 #ifdef DEBUG
-      printf("C = %f, \ttestC = %f, \tlda = %i , i = %i, j = %i, k = %i\r\n", C[i+j*lda], testCij, lda,i,j,k);
+      printf("C = %f, \ttestC = %f, \tn = %i , i = %i, j = %i, k = %i\r\n", C[i+j*n], testCij, n,i,j,k);
 #endif
-      // C[i+j*lda] = cij;
     }
 }
 
