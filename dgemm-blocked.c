@@ -20,15 +20,17 @@ int testCount;
 
 const char* dgemm_desc = "Simple blocked dgemm.";
 
-#if !defined(BLOCK_SIZE)
-#define BLOCK_SIZE 384
-#endif
-// int BLOCK_SIZE = 384;
+// #if !defined(BLOCK_SIZE)
+// #define BLOCK_SIZE 384
+// #endif
+int BLOCK_SIZE = 776;
+int SMALL_BLOCK_SIZE = 117;
 
 // 384 96
-#if !defined(SMALL_BLOCK_SIZE)
-#define SMALL_BLOCK_SIZE 96
-#endif
+// #if !defined(SMALL_BLOCK_SIZE)
+// #define SMALL_BLOCK_SIZE 96
+// #endif
+int firstTime = 1;
 
 #define min(a,b) (((a)<(b))?(a):(b))
 
@@ -175,7 +177,22 @@ static void do_block (int block_size, int lda, int M, int N, int K, double* A, d
  * On exit, A and B maintain their input values. */  
 void square_dgemm (int lda, double* A, double* B, double* C)
 {
-  // BLOCK_SIZE = lda/2;
+  if (firstTime)
+  {
+    char * s = getenv("BLOCK_SIZE");
+    if(s != NULL)
+    {
+      BLOCK_SIZE = atoi(s);
+    }
+    s = getenv("SMALL_BLOCK_SIZE");
+    if(s != NULL)
+    {
+      SMALL_BLOCK_SIZE = atoi(s);
+    }
+    printf("------------\r\nGrade BLOCK_SIZE = %i, SMALL_BLOCK_SIZE = %i\r\n", BLOCK_SIZE, SMALL_BLOCK_SIZE);
+    firstTime = 0;
+  }
+
  	int temp=0;
         for (int i=1; i<lda; i++){
                 for (int j=0; j<i; j++){
@@ -200,6 +217,6 @@ void square_dgemm (int lda, double* A, double* B, double* C)
       	int K = min (BLOCK_SIZE, lda-k);
 
       	/* Perform individual block dgemm */
-      	do_block(BLOCK_SIZE/2,lda, M, N, K, A + k + i*lda, B + k + j*lda, C + i + j*lda);
+      	do_block(BLOCK_SIZE,lda, M, N, K, A + k + i*lda, B + k + j*lda, C + i + j*lda);
       }
 }
