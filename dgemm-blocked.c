@@ -16,6 +16,8 @@ LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL
 #include <stdio.h>      /* printf, fgets */
 #include <stdlib.h>     /* atoi */
 
+int testCount;
+
 const char* dgemm_desc = "Simple blocked dgemm.";
 
 #if !defined(BLOCK_SIZE)
@@ -35,15 +37,18 @@ const char* dgemm_desc = "Simple blocked dgemm.";
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
 static void do_small_block (int lda, int M, int N, int K, double* A, double* B, double* C)
 {
+  testCount = 0;
   // printf("M = %i, N = %i, K = %i, lda = %i, double size = %i, bytes = %i\r\n",M,N,K,lda, (int)sizeof(double) , (M*N+M*K+K*N)* (int)sizeof(double) );
 
   /* For each row i of A */
   for (int i = 0; i < M; ++i) 
+  {
     /* For each column j of B */
-    for (int j = 0; j < N; ++j)
+    int j;
+    for (j = 0; j < N-4; j=j+4)
     {
 
-// #define DEBUG
+#define DEBUG
 #ifdef DEBUG
       /* TEST C(i,j) */
       double testCij = C[i+j*lda];
@@ -52,55 +57,88 @@ static void do_small_block (int lda, int M, int N, int K, double* A, double* B, 
 #endif
 
       /* Compute C(i,j) */
-      __m256d mCij = _mm256_setzero_pd();
+      __m256d mCij1 = _mm256_setzero_pd();
+      __m256d mCij2 = _mm256_setzero_pd();
+      __m256d mCij3 = _mm256_setzero_pd();
+      __m256d mCij4 = _mm256_setzero_pd();
       int k;
       // double newCij;
-      for (k = 0; k < K-16; k=k+16)
+      for (k = 0; k < K-4; k=k+4)
       {        
         // pre-load addreses
         double * b0 = &B[k+j*lda];
-        double * b1 = &B[4+k+j*lda];
-        double * b2 = &B[8+k+j*lda];
-        double * b3 = &B[12+k+j*lda];
+        double * b1 = &B[k+(1+j)*lda];
+        double * b2 = &B[k+(2+j)*lda];
+        double * b3 = &B[k+(3+j)*lda];
 
         double * a0 = &A[k+i*lda];
-        double * a1 = &A[4+k+i*lda];
-        double * a2 = &A[8+k+i*lda];
-        double * a3 = &A[12+k+i*lda];
 
-        __m256d row1 = _mm256_load_pd(b0);
-        __m256d col1 = _mm256_load_pd(a0);
-        mCij = _mm256_add_pd(mCij, _mm256_mul_pd(row1,col1));
-        __m256d row2 = _mm256_load_pd(b1);
-        __m256d col2 = _mm256_load_pd(a1);
-        mCij = _mm256_add_pd(mCij, _mm256_mul_pd(row2,col2));
-        __m256d row3 = _mm256_load_pd(b2);
-        __m256d col3 = _mm256_load_pd(a2);
-        mCij = _mm256_add_pd(mCij, _mm256_mul_pd(row3,col3));
-        __m256d row4 = _mm256_load_pd(b3);
-        __m256d col4 = _mm256_load_pd(a3);
-        mCij = _mm256_add_pd(mCij, _mm256_mul_pd(row4,col4));
+        __m256d row1 = _mm256_load_pd(a0);
+
+        __m256d col1 = _mm256_load_pd(b0);
+        mCij1 = _mm256_add_pd(mCij1, _mm256_mul_pd(row1,col1));
+
+        __m256d col2 = _mm256_load_pd(b1);
+        mCij2 = _mm256_add_pd(mCij2, _mm256_mul_pd(row1,col2));
+
+        __m256d col3 = _mm256_load_pd(b2);
+        mCij3 = _mm256_add_pd(mCij3, _mm256_mul_pd(row1,col3));
+
+        __m256d col4 = _mm256_load_pd(b3);
+        mCij4 = _mm256_add_pd(mCij4, _mm256_mul_pd(row1,col4));
 
 
       } // for k
 
-      double cijArr[4];
-      _mm256_store_pd(&cijArr[0], mCij);
+      double cijArr1[4];
+      _mm256_store_pd(&cijArr1[0], mCij1);
+      double cijArr2[4];
+      _mm256_store_pd(&cijArr2[0], mCij2);
+      double cijArr3[4];
+      _mm256_store_pd(&cijArr3[0], mCij3);
+      double cijArr4[4];
+      _mm256_store_pd(&cijArr4[0], mCij4);
 
       // Add all parts of sums
-      double tmpCij = C[i+j*lda] + cijArr[0] + cijArr[1] + cijArr[2] + cijArr[3];
+      double tmpCij1 = C[i+j*lda] + cijArr1[0] + cijArr1[1] + cijArr1[2] + cijArr1[3];
+      double tmpCij2 = C[i+(1+j)*lda] + cijArr2[0] + cijArr2[1] + cijArr2[2] + cijArr2[3];
+      double tmpCij3 = C[i+(2+j)*lda] + cijArr3[0] + cijArr3[1] + cijArr3[2] + cijArr3[3];
+      double tmpCij4 = C[i+(3+j)*lda] + cijArr4[0] + cijArr4[1] + cijArr4[2] + cijArr4[3];
       while(k < K)
       {
-        tmpCij += A[k+i*lda] * B[k+j*lda];
+        double tmpA = A[k+i*lda];
+        tmpCij1 += tmpA * B[k+j*lda];
+        tmpCij2 += tmpA * B[k+(1+j)*lda];
+        tmpCij3 += tmpA * B[k+(2+j)*lda];
+        tmpCij4 += tmpA * B[k+(3+j)*lda];
         k++;
       }
 
-      C[i+j*lda] = tmpCij;
+      C[i+j*lda] = tmpCij1;
+      C[i+(1+j)*lda] = tmpCij2;
+      C[i+(2+j)*lda] = tmpCij3;
+      C[i+(3+j)*lda] = tmpCij4;
+      testCount += 4;
 
 #ifdef DEBUG
-      printf("lda = %i , i = %i, j = %i, k = %i, C = %8f, \ttestC = %8f\r\n", lda,i,j,k,C[i+j*lda], testCij);
+      // printf("lda = %i , i = %i, j = %i, k = %i, C = %8f, \ttestC = %8f\r\n", lda,i,j,k,C[i+j*lda], testCij);
 #endif
+    } // for j
+
+    while (j < N)
+    {
+      double cij = C[i+j*lda];
+      for (int k = 0; k < K; ++k)
+      {
+        cij += A[k+i*lda] * B[k+j*lda];
+      }
+      C[i+j*lda] = cij;
+      testCount++;
+      j++;
     }
+
+  // printf("total = %i, testCount = %i, i = %i, j = %i, M = %i, N = %i\r\n", M*N, testCount,i,j,M,N);
+  } // for i
 }
 
 /* This auxiliary subroutine performs a smaller dgemm operation
