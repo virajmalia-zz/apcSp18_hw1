@@ -58,26 +58,12 @@ void square_dgemm (int n, double* A, double* B, double* C)
       for (k = 0; k < n-8; k=k+8)
       {        
         __m256d row1 = _mm256_load_pd(&B[k+j*n]);
-        // __m128d row2 = _mm_load_pd(&B[2+k+j*n]);
         __m256d row3 = _mm256_load_pd(&B[4+k+j*n]);
-        // __m128d row4 = _mm_load_pd(&B[6+k+j*n]);
         __m256d col1 = _mm256_load_pd(&A[k+i*n]);
-        // __m128d col2 = _mm_load_pd(&A[2+k+i*n]);
         __m256d col3 = _mm256_load_pd(&A[4+k+i*n]);
-        // __m128d col4 = _mm_load_pd(&A[6+k+i*n]);
 
         mCij = _mm256_add_pd(mCij, _mm256_mul_pd(row1,col1));
         mCij = _mm256_add_pd(mCij, _mm256_mul_pd(row3,col3));
-        // mCij = _mm_add_pd(mCij, 
-        //   _mm_add_pd(
-        //     _mm_add_pd(
-        //       _mm_mul_pd(row1,col1),
-        //       _mm_mul_pd(row2,col2)),
-        //     _mm_add_pd(
-        //       _mm_mul_pd(row3,col3),
-        //       _mm_mul_pd(row4,col4))
-        //   )
-        // );
       } // for k
 
       double cijArr[4];
