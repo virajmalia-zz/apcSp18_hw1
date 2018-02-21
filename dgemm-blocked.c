@@ -23,7 +23,7 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 // #if !defined(BLOCK_SIZE)
 // #define BLOCK_SIZE 384
 // #endif
-int BLOCK_SIZE = 776;
+int BLOCK_SIZE = 117;
 int SMALL_BLOCK_SIZE = 117;
 
 // 384 96
@@ -162,7 +162,7 @@ static void do_block (int block_size, int lda, int M, int N, int K, double* A, d
         int R = min (block_size, K-k);
         if (block_size > SMALL_BLOCK_SIZE) 
         {
-          do_block(block_size/2, lda, P, Q, R, A + k + i*lda, B + k + j*lda, C + i + j*lda);
+          do_block(SMALL_BLOCK_SIZE, lda, P, Q, R, A + k + i*lda, B + k + j*lda, C + i + j*lda);
         } else {
           do_small_block(lda, P, Q, R, A + k + i*lda, B + k + j*lda, C + i + j*lda);
         }
