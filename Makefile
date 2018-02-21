@@ -1,11 +1,11 @@
 # On Bridges we will check versus your performance versus Intel MKL library's BLAS. 
 
-CC = icc 
-OPT = -O3 -xHOST 
+CC = icc
+OPT = -O3 -xHOST -Ofast -march=core-avx2 -funroll-loops -no-prec-div -ansi-alias -qopt-report=5
 CFLAGS = -Wall -std=gnu99 $(OPT)
 #MKLROOT = /opt/intel/composer_xe_2013.1.117/mkl
 #LDLIBS = -lrt -Wl,--start-group $(MKLROOT)/lib/intel64/libmkl_intel_lp64.a $(MKLROOT)/lib/intel64/libmkl_sequential.a $(MKLROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -lpthread -lm
-LDLIBS = -lrt  -I$(MKLROOT)/include -Wl,-L$(MKLROOT)/lib/intel64/ -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm -ldl -qopt-report=2
+LDLIBS = -lrt  -I$(MKLROOT)/include -Wl,-L$(MKLROOT)/lib/intel64/ -lmkl_intel_lp64 -lmkl_core -lmkl_sequential -lpthread -lm -ldl
 
 targets = benchmark-naive benchmark-blocked benchmark-blas
 objects = benchmark.o dgemm-naive.o dgemm-blocked.o dgemm-blas.o
@@ -28,4 +28,4 @@ benchmark-blas : benchmark.o dgemm-blas.o
 
 .PHONY : clean
 clean:
-	rm -f $(targets) $(objects) *.stdout
+	rm -f $(targets) $(objects) *.stdout *.optrpt
