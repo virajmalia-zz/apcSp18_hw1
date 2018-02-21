@@ -18,22 +18,22 @@ const char* dgemm_desc = "Simple blocked dgemm.";
 #if !defined(BLOCK_SIZE)
 #define BLOCK_SIZE 100
 #endif
-
+#include <malloc.h>
 #define min(a,b) (((a)<(b))?(a):(b))
 
 /* This auxiliary subroutine performs a smaller dgemm operation
  *  C := C + A * B
  * where C is M-by-N, A is M-by-K, and B is K-by-N. */
-static void do_block (int lda, int M, int N, int K, double* A, double* B, double* C)
+static void do_block (int lda, double* restrict A, double* restrict B, double* restrict C)
 {
   /* For each row i of A */
-  for (int i = 0; i < M; ++i)
+  for (int i = 0; i < lda; ++i)
     /* For each column j of B */ 
-    for (int j = 0; j < N; ++j) 
+    for (int j = 0; j < lda; ++j) 
     {
       /* Compute C(i,j) */
       double cij = C[i+j*lda];
-      for (int k = 0; k < K; ++k)
+      for (int k = 0; k < lda; ++k)
 	cij += A[k+i*lda] * B[k+j*lda];
       C[i+j*lda] = cij;
     }
@@ -43,33 +43,68 @@ static void do_block (int lda, int M, int N, int K, double* A, double* B, double
  *  C := C + A * B
  * where A, B, and C are lda-by-lda matrices stored in column-major format. 
  * On exit, A and B maintain their input values. */  
-void square_dgemm (int lda, double* A, double* B, double* C)
+void square_dgemm (int register lda, double* restrict a, double* restrict b, double* restrict c)
 {
 
- 	int temp=0;
-        for (int i=1; i<lda; i++){
-                for (int j=0; j<i; j++){
-                        temp = A[i+j*lda];
-                        A[i+j*lda] = A[j+i*lda];
-                        A[j+i*lda] = temp;
+	int old_d = lda;
+	// Make lda to next power of 2
+	lda--;
+	lda |= lda >> 1;
+	lda |= lda >> 2;
+	lda |= lda >> 4;
+	lda |= lda >> 8;
+	lda |= lda >> 16;
+	lda++;
+
+	double* restrict __attribute__((aligned(16))) A = malloc(sizeof(double)*lda*lda);
+	double* restrict __attribute__((aligned(16))) B = malloc(sizeof(double)*lda*lda);
+	double* restrict __attribute__((aligned(16))) C = malloc(sizeof(double)*lda*lda);
+	
+	for (int i = 0; i<old_d; i++){
+		#pragma vector always
+                for (int j=0; j<old_d; j++){
+                        A[j+i*old_d] = a[i+j*old_d];
+			B[j+i*old_d] = b[j+i*old_d];
+			C[j+i*old_d] = c[j+i*old_d];
                 }
-        } 
+        }
 
+	// Row padding
+	for(int r=0; r<old_d; r++){
+		for(int c = old_d; c<lda; c++){
+			A[c+r*lda] = 0;
+                        B[c+r*lda] = 0;
+                        C[c+r*lda] = 0;
+		}
+	}
+	
+	// Column padding
+	for(int r = old_d; r<lda; r++){
+                for(int c = 0; c<lda; c++){
+                        A[c+r*lda] = 0;
+                        B[c+r*lda] = 0;
+                        C[c+r*lda] = 0;
+                }
+        }
 
+	//free(a);
+	//free(b);
+	//free(c);
 
 /* For each block-row of A */ 
   for (int i = 0; i < lda; i += BLOCK_SIZE)
     /* For each block-column of B */
     for (int j = 0; j < lda; j += BLOCK_SIZE)
       /* Accumulate block dgemms into block of C */
+	
       for (int k = 0; k < lda; k += BLOCK_SIZE)
       {
 	/* Correct block dimensions if block "goes off edge of" the matrix */
-	int M = min (BLOCK_SIZE, lda-i);
-	int N = min (BLOCK_SIZE, lda-j);
-	int K = min (BLOCK_SIZE, lda-k);
+	//int M = min (BLOCK_SIZE, lda-i);
+	//int N = min (BLOCK_SIZE, lda-j);
+	//int K = min (BLOCK_SIZE, lda-k);
 
 	/* Perform individual block dgemm */
-	do_block(lda, M, N, K, A + k + i*lda, B + k + j*lda, C + i + j*lda);
+	do_block(lda, A + k + i*lda, B + k + j*lda, C + i + j*lda);
       }
 }
